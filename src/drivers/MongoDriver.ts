@@ -3,6 +3,8 @@ import { DataStore } from '../interfaces/interfaces';
 import { StandardOutcomeDocument } from '@cyber4all/clark-schema';
 import { OutcomeFilter, suggestMode } from '../interfaces/DataStore';
 import * as dotenv from 'dotenv';
+import { DriverError, GENERIC_REASON } from '../types';
+import { handlePromise } from '../utils';
 dotenv.config();
 
 export interface Collection {
@@ -99,8 +101,15 @@ export class MongoDriver implements DataStore {
    * @memberof MongoDriver
    */
   async connect(dbURI: string, retryAttempt?: number): Promise<void> {
+    const connectionError = new DriverError(
+      `Problem connecting to database at ${dbURI}`,
+      GENERIC_REASON.UNEXPECTED_ERROR,
+    );
     try {
-      this.db = await MongoClient.connect(dbURI);
+      this.db = await handlePromise(
+        MongoClient.connect(dbURI),
+        connectionError,
+      );
     } catch (e) {
       if (!retryAttempt) {
         this.connect(
@@ -108,9 +117,7 @@ export class MongoDriver implements DataStore {
           1,
         );
       } else {
-        return Promise.reject(
-          'Problem connecting to database at ' + dbURI + ':\n\t' + e,
-        );
+        throw connectionError;
       }
     }
   }
@@ -136,44 +143,44 @@ export class MongoDriver implements DataStore {
     limit?: number,
     page?: number,
   ): Promise<{ total: number; outcomes: StandardOutcomeDocument[] }> {
-    try {
-      if (page !== undefined && page <= 0) {
-        page = 1;
-      }
-      const skip = page && limit ? (page - 1) * limit : undefined;
-      const query: any = {
-        $or: [
-          { $text: { $search: filter.text } },
-          { outcome: new RegExp(filter.text, 'ig') },
-        ],
-      };
-      delete filter.text;
-      for (const prop of Object.keys(filter)) {
-        query[prop] = { $regex: new RegExp(filter[prop], 'ig') };
-      }
-      let docs = await this.db
-        .collection(COLLECTIONS.StandardOutcome.name)
-        .find(query);
-
-      const total = await docs.count();
-
-      docs =
-        skip !== undefined
-          ? docs.skip(skip).limit(limit)
-          : limit
-            ? docs.limit(limit)
-            : docs;
-
-      let outcomes = await docs.toArray();
-      outcomes = outcomes.map(outcome => {
-        outcome.id = outcome._id;
-        delete outcome._id;
-        return outcome;
-      });
-      return { total: total, outcomes: outcomes };
-    } catch (e) {
-      return Promise.reject(e);
+    if (page !== undefined && page <= 0) {
+      page = 1;
     }
+    const skip = page && limit ? (page - 1) * limit : undefined;
+    const query: any = {
+      $or: [
+        { $text: { $search: filter.text } },
+        { outcome: new RegExp(filter.text, 'ig') },
+      ],
+    };
+    delete filter.text;
+    for (const prop of Object.keys(filter)) {
+      query[prop] = { $regex: new RegExp(filter[prop], 'ig') };
+    }
+    let docs = this.db.collection(COLLECTIONS.StandardOutcome.name).find(query);
+
+    const total = await handlePromise(
+      docs.count(),
+      new DriverError(null, GENERIC_REASON.UNEXPECTED_ERROR),
+    );
+
+    docs =
+      skip !== undefined
+        ? docs.skip(skip).limit(limit)
+        : limit
+          ? docs.limit(limit)
+          : docs;
+
+    let outcomes = await handlePromise(
+      docs.toArray(),
+      new DriverError(null, GENERIC_REASON.UNEXPECTED_ERROR),
+    );
+    outcomes = outcomes.map(outcome => {
+      outcome.id = outcome._id;
+      delete outcome._id;
+      return outcome;
+    });
+    return { total: total, outcomes: outcomes };
   }
   /**
    * Suggests outcomes based on user input
@@ -193,67 +200,69 @@ export class MongoDriver implements DataStore {
     limit?: number,
     page?: number,
   ): Promise<{ total: number; outcomes: StandardOutcomeDocument[] }> {
-    try {
-      if (page !== undefined && page <= 0) {
-        page = 1;
-      }
-      const skip = page && limit ? (page - 1) * limit : undefined;
-
-      const text = filter.text;
-      delete filter.text;
-
-      const query: any = { $text: { $search: text } };
-
-      if (filter.name) {
-        query.name = { $regex: new RegExp(filter.name, 'ig') };
-
-        delete filter.name;
-      }
-      if (filter.source) {
-        query.source = { $regex: new RegExp(filter.source, 'ig') };
-        delete filter.source;
-      }
-
-      for (const prop of Object.keys(filter)) {
-        query[prop] = filter[prop];
-      }
-
-      let docs = await this.db
-        .collection(COLLECTIONS.StandardOutcome.name)
-        .aggregate([
-          { $match: query },
-          {
-            $project: {
-              _id: 0,
-              id: '$_id',
-              author: 1,
-              name: 1,
-              date: 1,
-              outcome: 1,
-              source: 1,
-              tag: 1,
-              score: { $meta: 'textScore' },
-            },
-          },
-          { $match: { score: { $gt: threshold } } },
-        ])
-        .sort({ score: { $meta: 'textScore' } });
-
-      const arr = await docs.toArray();
-      const total = arr.length;
-
-      docs =
-        skip !== undefined
-          ? docs.skip(skip).limit(limit)
-          : limit
-            ? docs.limit(limit)
-            : docs;
-
-      const outcomes = await docs.toArray();
-      return { total, outcomes };
-    } catch (e) {
-      return Promise.reject(e);
+    if (page !== undefined && page <= 0) {
+      page = 1;
     }
+    const skip = page && limit ? (page - 1) * limit : undefined;
+
+    const text = filter.text;
+    delete filter.text;
+
+    const query: any = { $text: { $search: text } };
+
+    if (filter.name) {
+      query.name = { $regex: new RegExp(filter.name, 'ig') };
+
+      delete filter.name;
+    }
+    if (filter.source) {
+      query.source = { $regex: new RegExp(filter.source, 'ig') };
+      delete filter.source;
+    }
+
+    for (const prop of Object.keys(filter)) {
+      query[prop] = filter[prop];
+    }
+
+    let docs = this.db
+      .collection(COLLECTIONS.StandardOutcome.name)
+      .aggregate([
+        { $match: query },
+        {
+          $project: {
+            _id: 0,
+            id: '$_id',
+            author: 1,
+            name: 1,
+            date: 1,
+            outcome: 1,
+            source: 1,
+            tag: 1,
+            score: { $meta: 'textScore' },
+          },
+        },
+        { $match: { score: { $gt: threshold } } },
+      ])
+      .sort({ score: { $meta: 'textScore' } });
+
+    const arr = await handlePromise(
+      docs.toArray(),
+      new DriverError(null, GENERIC_REASON.UNEXPECTED_ERROR),
+    );
+    const total = arr.length;
+
+    docs =
+      skip !== undefined
+        ? docs.skip(skip).limit(limit)
+        : limit
+          ? docs.limit(limit)
+          : docs;
+
+    const outcomes = await handlePromise(
+      docs.toArray(),
+      new DriverError(null, GENERIC_REASON.UNEXPECTED_ERROR),
+    );
+    return { total, outcomes };
   }
 
   /**
@@ -263,12 +272,11 @@ export class MongoDriver implements DataStore {
    * @memberof MongoDriver
    */
   public async fetchSources(): Promise<string[]> {
-    try {
-      return (<any>(
-        this.db.collection(COLLECTIONS.StandardOutcome.name)
-      )).distinct('source');
-    } catch (e) {
-      return Promise.reject(e);
-    }
+    return await handlePromise<string[]>(
+      (<any>this.db.collection(COLLECTIONS.StandardOutcome.name)).distinct(
+        'source',
+      ),
+      new DriverError(null, GENERIC_REASON.UNEXPECTED_ERROR),
+    );
   }
 }
