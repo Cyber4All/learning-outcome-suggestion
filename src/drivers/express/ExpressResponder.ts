@@ -7,7 +7,7 @@ export class ExpressResponder implements Responder {
     this.res.sendStatus(200);
   }
   sendOperationError(error: ClientError): void {
-    this.res.status(error.status).send(error.message);
+    this.res.status(error.status).send(error);
   }
   sendObject(object: any): void {
     this.res.status(200).send(object);
