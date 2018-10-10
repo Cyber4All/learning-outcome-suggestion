@@ -31,6 +31,7 @@ export class ExpressRouteDriver {
     });
 
     router.get('/outcomes', async (req, res) => {
+      const responder = this.getResponder(res);
       try {
         let filter: OutcomeFilter = {
           text: req.query.text ? req.query.text : '',
@@ -40,19 +41,20 @@ export class ExpressRouteDriver {
         };
         let page = req.query.page ? +req.query.page : undefined;
         let limit = req.query.limit ? +req.query.limit : undefined;
-        await SuggestionInteractor.searchOutcomes(
+        const outcomes = await SuggestionInteractor.searchOutcomes(
           this.dataStore,
-          this.getResponder(res),
           filter,
           page,
           limit,
         );
+        responder.sendObject(outcomes);
       } catch (e) {
-        console.log(e);
+        responder.sendOperationError(e);
       }
     });
 
     router.get('/outcomes/suggest', async (req, res) => {
+      const responder = this.getResponder(res);
       try {
         const mode: suggestMode = 'text';
         const scoreThreshold: number = process.env.SUGGESTION_THRESHOLD
@@ -66,17 +68,17 @@ export class ExpressRouteDriver {
         };
         let page = req.query.page ? +req.query.page : undefined;
         let limit = req.query.limit ? +req.query.limit : undefined;
-        await SuggestionInteractor.suggestOutcomes(
+        const outcomes = await SuggestionInteractor.suggestOutcomes(
           this.dataStore,
-          this.getResponder(res),
           filter,
           mode,
           scoreThreshold,
           limit,
           page,
         );
+        responder.sendObject(outcomes);
       } catch (e) {
-        console.log(e);
+        responder.sendOperationError(e);
       }
     });
 

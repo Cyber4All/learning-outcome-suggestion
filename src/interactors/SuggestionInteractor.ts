@@ -3,6 +3,8 @@ import { suggestMode, OutcomeFilter } from '../interfaces/DataStore';
 import * as spellcheck from 'spellchecker';
 import * as stopword from 'stopword';
 import * as stemmer from 'stemmer';
+import { StandardOutcomeDocument } from '@cyber4all/clark-schema';
+import { ClientError, GENERIC_REASON } from '../types';
 
 export class SuggestionInteractor {
   /**
@@ -21,27 +23,31 @@ export class SuggestionInteractor {
    */
   public static async suggestOutcomes(
     dataStore: DataStore,
-    responder: Responder,
     filter: OutcomeFilter,
     mode: suggestMode = 'text',
     threshold: number = 0,
     limit?: number,
     page?: number,
-  ): Promise<void> {
+  ): Promise<{ total: number; outcomes: StandardOutcomeDocument[] }> {
     try {
       filter = this.sanitizeFilter(filter);
       filter.text = this.removeStopwords(filter.text);
       filter.text = this.stemWords(filter.text);
-      const suggestions = await dataStore.suggestOutcomes(
+      return await dataStore.suggestOutcomes(
         filter,
         mode,
         threshold,
         limit,
         page,
       );
-      responder.sendObject(suggestions);
     } catch (e) {
-      responder.sendOperationError(`Problem suggesting outcomes. Error: ${e}.`);
+      console.error(e);
+      const clientErr: ClientError = {
+        message: `Could not suggest outcomes.`,
+        error: e,
+        status: e.reason ? e.reason : GENERIC_REASON.UNEXPECTED_ERROR,
+      };
+      return Promise.reject(clientErr);
     }
   }
   /**
@@ -58,17 +64,21 @@ export class SuggestionInteractor {
    */
   public static async searchOutcomes(
     dataStore: DataStore,
-    responder: Responder,
     filter: OutcomeFilter,
     limit?: number,
     page?: number,
-  ): Promise<void> {
+  ): Promise<{ total: number; outcomes: StandardOutcomeDocument[] }> {
     try {
       filter = this.sanitizeFilter(filter);
-      const suggestions = await dataStore.searchOutcomes(filter, limit, page);
-      responder.sendObject(suggestions);
+      return await dataStore.searchOutcomes(filter, limit, page);
     } catch (e) {
-      responder.sendOperationError(`Problem searching outcomes. Error: ${e}.`);
+      console.error(e);
+      const clientErr: ClientError = {
+        message: `Could not search outcomes.`,
+        error: e,
+        status: e.reason ? e.reason : GENERIC_REASON.UNEXPECTED_ERROR,
+      };
+      return Promise.reject(clientErr);
     }
   }
 
@@ -82,9 +92,15 @@ export class SuggestionInteractor {
    */
   public static async fetchSources(dataStore: DataStore): Promise<string[]> {
     try {
-      return dataStore.fetchSources();
+      return await dataStore.fetchSources();
     } catch (e) {
-      return Promise.reject(`Problem finding sources. Error: ${e}.`);
+      console.error(e);
+      const clientErr: ClientError = {
+        message: `Could not fetch sources.`,
+        error: e,
+        status: e.reason ? e.reason : GENERIC_REASON.UNEXPECTED_ERROR,
+      };
+      return Promise.reject(clientErr);
     }
   }
 
