@@ -45,7 +45,6 @@ export class SuggestionInteractor {
       const clientErr: ClientError = {
         message: `Could not suggest outcomes.`,
         error: e,
-        status: e.reason ? e.reason : GENERIC_REASON.UNEXPECTED_ERROR,
       };
       return Promise.reject(clientErr);
     }
@@ -76,7 +75,6 @@ export class SuggestionInteractor {
       const clientErr: ClientError = {
         message: `Could not search outcomes.`,
         error: e,
-        status: e.reason ? e.reason : GENERIC_REASON.UNEXPECTED_ERROR,
       };
       return Promise.reject(clientErr);
     }
@@ -98,7 +96,6 @@ export class SuggestionInteractor {
       const clientErr: ClientError = {
         message: `Could not fetch sources.`,
         error: e,
-        status: e.reason ? e.reason : GENERIC_REASON.UNEXPECTED_ERROR,
       };
       return Promise.reject(clientErr);
     }
