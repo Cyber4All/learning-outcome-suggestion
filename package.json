@@ -43,7 +43,7 @@
     "@types/stemmer": "^1.0.1",
     "@types/dotenv": "^4.0.2",
     "@types/express": "^4.0.39",
-    "@types/jsonfile": "^4.0.0",
+    "@types/jsonfile": "^5.0.0",
     "@types/line-reader": "0.0.28",
     "@types/mongodb": "^3.1.1",
     "@types/oboe": "^2.0.28",
