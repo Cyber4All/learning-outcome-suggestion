@@ -7,7 +7,7 @@
 # ------------------------------------------------------
 # STAGE BUILD
 # ------------------------------------------------------
-FROM node:8 as build
+FROM node:12 as build
 ARG UNIT_TEST=0
 WORKDIR /build
 COPY . .
