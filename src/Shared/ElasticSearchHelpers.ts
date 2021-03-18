@@ -1,13 +1,13 @@
-import * as request from 'request-promise';
 import { SearchResponse } from 'elasticsearch';
 import { StandardOutcome } from '@cyber4all/clark-entity';
-import { RequestError, StatusCodeError } from 'request-promise/errors';
 import {
   ResourceError,
   ResourceErrorReason,
   ServiceError,
   ServiceErrorReason,
 } from './Errors';
+
+const fetch = require('node-fetch');
 
 const ELASTIC_SEARCH_URI = process.env.ELASTIC_SEARCH_URI;
 const GUIDELINE_URI = `${ELASTIC_SEARCH_URI}/enguidelines/_search`;
@@ -45,20 +45,35 @@ export function queryGuidelines(
     total: number;
     outcomes: StandardOutcome[];
   }>((resolve, reject) => {
-    request({
-      uri: GUIDELINE_URI,
-      json: true,
-      body: query,
+    fetch(GUIDELINE_URI, {
+      body: JSON.stringify(query),
       headers: {
         'Host': process.env.ELASTIC_SEARCH_HEADER,
+        'Content-Type': 'application/json',
       },
+      method: 'post'
     })
-      .then((res: SearchResponse<Partial<StandardOutcome>>) =>
-        resolve(toPaginatedGuidelines(res)),
-      )
-      .catch(transformRequestError)
-      .catch((e: Error) => reject(e));
+    .then(checkStatus)
+    .then((json: any) => resolve(toPaginatedGuidelines(json)))
+    .catch(transformRequestError)
+    .catch((e: Error) => reject(e));
   });
+}
+
+/**
+ * This checks the status of the response from the node-fetch
+ * statement to see if it threw an error message
+ * 
+ * @param res The node-fetch response object
+ * @returns The json of the request or throws and error
+ */
+function checkStatus(res: any): Promise<any> {
+  // res.status >= 200 && res.status < 300
+  if (res.ok) {
+      return res.json();
+  } else {
+      throw res;
+  }
 }
 
 /**
@@ -92,9 +107,9 @@ function toPaginatedGuidelines(
  * @param {string} message [Custom error message]
  * @memberof HttpLearningObjectGateway
  */
-function transformRequestError(e: RequestError, message?: string) {
-  if (e instanceof StatusCodeError) {
-    switch (e.statusCode) {
+function transformRequestError(e: any, message?: string) {
+  if (e) {
+    switch (e.status) {
       case 400:
         throw new ResourceError(
           message || 'Unable to load resource',
