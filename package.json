@@ -26,13 +26,13 @@
   "dependencies": {
     "@cyber4all/clark-entity": "^4.0.0",
     "@cyber4all/clark-schema": "^1.0.2",
-    "@sentry/node": "^5.0.6",
+    "@sentry/node": "^6.2.2",
     "cors": "^2.8.5",
     "dotenv": "^6.0.0",
     "express": "^4.16.2",
     "mongodb": "^3.1.13",
     "morgan": "^1.9.0",
-    "request-promise": "^4.2.4"
+    "node-fetch": "^2.6.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.4",
@@ -42,7 +42,6 @@
     "@types/jest": "^26.0.20",
     "@types/mongodb": "^3.1.19",
     "@types/morgan": "^1.7.35",
-    "@types/request-promise": "^4.1.42",
     "@types/supertest": "^2.0.7",
     "jest": "^26.6.3",
     "natives": "^1.1.3",
